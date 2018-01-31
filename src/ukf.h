@@ -114,6 +114,11 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+
+  /**
+  * A helper method to calculate NIS
+  */
+  float CalculateNIS(const VectorXd z_diff, const MatrixXd S);
 };
 
 #endif /* UKF_H */

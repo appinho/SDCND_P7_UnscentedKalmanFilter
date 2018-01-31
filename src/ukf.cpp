@@ -333,6 +333,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   std::cout << "Laser Update" << std::endl;
   std::cout << "x = " << std::endl << x_ << std::endl;
   std::cout << "P = " << std::endl << P_ << std::endl;
+  std::cout << "eps = " << std::endl << CalculateNIS(z_diff,S) << std::endl;
   // std::cout << std::endl << std::endl;
 }
 
@@ -430,5 +431,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   std::cout << "Radar Update" << std::endl;
   std::cout << "x = " << std::endl << x_ << std::endl;
   std::cout << "P = " << std::endl << P_ << std::endl;
+  std::cout << "eps = " << std::endl << CalculateNIS(z_diff,S) << std::endl;
   // std::cout << std::endl << std::endl;
+}
+
+float UKF::CalculateNIS(const VectorXd z_diff, const MatrixXd S){
+  
+  return z_diff.transpose() * S.inverse() * z_diff;
 }
