@@ -64,8 +64,20 @@ public:
   ///* Augmented state dimension
   int n_aug_;
 
+  ///* Radar measurement dimension
+  int n_z_radar_;
+
+  ///* Laser measurement dimension
+  int n_z_laser_;
+
   ///* Sigma point spreading parameter
   double lambda_;
+
+  ///* Measurement covariance matrix for radar
+  MatrixXd R_radar_;
+
+  ///* Measurement covariance matrix for laser
+  MatrixXd R_laser_;
 
 
   /**

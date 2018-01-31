@@ -25,6 +25,8 @@ UKF::UKF() {
   // Choose state dimensions
   n_x_ = 5;
   n_aug_ = 7;
+  n_z_radar_ = 3;
+  n_z_laser_ = 2;
 
   // initial state vector
   x_ = VectorXd::Zero(n_x_);
@@ -36,10 +38,10 @@ UKF::UKF() {
   Xsig_pred_ = MatrixXd::Zero(n_x_, 2 * n_aug_ + 1);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 3;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 2 * M_PI;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -63,6 +65,16 @@ UKF::UKF() {
 
   // Choose lambda
   lambda_ = 3 - n_aug_;
+
+  // Choose measurement covariance matrix for radar
+  R_radar_ = MatrixXd(n_z_radar_,n_z_radar_);
+  R_radar_ << std_radr_ * std_radr_, 0, 0,
+          0, std_radphi_ * std_radphi_, 0,
+          0, 0,std_radrd_ * std_radrd_;
+
+  R_laser_ = MatrixXd(n_z_laser_,n_z_laser_);
+  R_laser_ << std_laspx_ * std_laspx_, 0,
+          0, std_laspy_ * std_laspy_;
 }
 
 UKF::~UKF() {}
@@ -95,10 +107,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       x_(0) = meas_package.raw_measurements_(0);
       x_(1) = meas_package.raw_measurements_(1);
     }
-    // TODO delete
-    x_(2) = 10;
-    x_(3) = -0.2;
-    x_(4) = 0.1;
 
     // Init state covariance
     P_ <<  1,  0,  0,  0,  0,
@@ -150,7 +158,7 @@ void UKF::Prediction(double delta_t) {
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
 
-  std::cout << "Predict with dt = " << delta_t << " s" << std::endl;
+  // std::cout << "Predict with dt = " << delta_t << " s" << std::endl;
 
 
   // 1. Generate augmented sigma points
@@ -180,7 +188,7 @@ void UKF::Prediction(double delta_t) {
     Xsig_aug.col(i + 1 + n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * L.col(i);
   }
 
-  std::cout << "Generated sigma points " << std::endl << Xsig_aug << std::endl << std::endl;
+  // std::cout << "Generated sigma points " << std::endl << Xsig_aug << std::endl << std::endl;
 
   // 2. Predict sigma points
   for (int i = 0; i< 2 * n_aug_ + 1; i++){
@@ -225,7 +233,7 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(3,i) = yaw_p;
     Xsig_pred_(4,i) = yawd_p;
   }
-  std::cout << "Predicted sigma points " << std::endl << Xsig_pred_ << std::endl << std::endl;
+  // std::cout << "Predicted sigma points " << std::endl << Xsig_pred_ << std::endl << std::endl;
 
   // 3. Predict mean and covariance
   // Set weights
@@ -233,7 +241,7 @@ void UKF::Prediction(double delta_t) {
   for (int i = 1; i < 2 * n_aug_ + 1; i++) {  //2n+1 weights
     weights_(i) = 0.5 / (n_aug_ + lambda_);
   }
-  std::cout << "Weights " << std::endl << weights_ << std::endl << std::endl;
+  // std::cout << "Weights " << std::endl << weights_ << std::endl << std::endl;
 
   // Predicted state mean
   x_.fill(0.0);
@@ -277,6 +285,9 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   */
   std::cout << "Lidar Update with = " << std::endl 
     << meas_package.raw_measurements_ << std::endl;
+
+  // Predict measurement
+
 }
 
 /**
@@ -292,6 +303,94 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
   */
-  std::cout << "Radar Update with = " << std::endl 
-    << meas_package.raw_measurements_ << std::endl;
+  // std::cout << "Radar Update with = " << std::endl 
+    // << meas_package.raw_measurements_ << std::endl;
+
+  // 1. Predict measurement
+  // Init measurement sigma points
+  MatrixXd Zsig = MatrixXd(n_z_radar_, 2 * n_aug_ + 1);
+
+  // Predict measurement
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred_(0,i);
+    double p_y = Xsig_pred_(1,i);
+    double v  = Xsig_pred_(2,i);
+    double yaw = Xsig_pred_(3,i);
+
+    double v1 = cos(yaw)*v;
+    double v2 = sin(yaw)*v;
+
+    // measurement model
+    Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);                        //r
+    Zsig(1,i) = atan2(p_y,p_x);                                 //phi
+    Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);   //r_dot
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z_radar_);
+  z_pred.fill(0.0);
+  for (int i=0; i < 2 * n_aug_ + 1; i++) {
+      z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z_radar_, n_z_radar_);
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z_radar_);
+
+  S.fill(0.0);
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
+    //residual
+    VectorXd z_sig_diff = Zsig.col(i) - z_pred;
+
+    //angle normalization
+    while (z_sig_diff(1) >  M_PI) z_sig_diff(1) -= 2. * M_PI;
+    while (z_sig_diff(1) < -M_PI) z_sig_diff(1) += 2. * M_PI;
+
+    S = S + weights_(i) * z_sig_diff * z_sig_diff.transpose();
+
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+
+    Tc = Tc + weights_(i) * x_diff * z_sig_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+
+  S = S + R_radar_;
+
+  // 2. State update
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z_diff = meas_package.raw_measurements_ - z_pred;
+
+  //angle normalization
+  while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
+  while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+
+    // Print
+  // cout << "Radar Measurement" << endl;
+  // std::cout << "z_pred " << std::endl << z_pred << std::endl;
+  // std::cout << "z " << std::endl << meas_package.raw_measurements_ << std::endl;
+  // std::cout << "z_diff " << std::endl << z_diff << std::endl;
+  // std::cout << "S " << std::endl << S << std::endl;
+
+  //update state mean and covariance matrix
+  x_ = x_ + K * z_diff;
+  P_ = P_ - K * S * K.transpose();
+
+    // Print prediction
+  std::cout << "Update" << std::endl;
+  std::cout << "x = " << std::endl << x_ << std::endl;
+  std::cout << "P = " << std::endl << P_ << std::endl;
+  std::cout << std::endl << std::endl;
 }
