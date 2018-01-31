@@ -59,11 +59,17 @@ UKF::UKF() {
   std_radrd_ = 0.3;
   //DO NOT MODIFY measurement noise values above these are provided by the sensor manufacturer.
 
-  // Init weights
-  weights_ = VectorXd::Zero(2 * n_aug_ + 1);
-
   // Choose lambda
   lambda_ = 9 - n_aug_;
+  
+  // Init weights
+  weights_ = VectorXd(2 * n_aug_ + 1);
+  // Set weights
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
+  for (int i = 1; i < 2 * n_aug_ + 1; i++) {  //2n+1 weights
+    weights_(i) = 0.5 / (n_aug_ + lambda_);
+  }
+  // std::cout << "Weights " << std::endl << weights_ << std::endl << std::endl;
 
   // Choose measurement covariance matrix for radar
   R_radar_ = MatrixXd(n_z_radar_,n_z_radar_);
@@ -223,13 +229,6 @@ void UKF::Prediction(double delta_t) {
   // std::cout << "Predicted sigma points " << std::endl << Xsig_pred_ << std::endl << std::endl;
 
   // 3. Predict mean and covariance
-  // Set weights
-  weights_(0) = lambda_ / (lambda_ + n_aug_);
-  for (int i = 1; i < 2 * n_aug_ + 1; i++) {  //2n+1 weights
-    weights_(i) = 0.5 / (n_aug_ + lambda_);
-  }
-  // std::cout << "Weights " << std::endl << weights_ << std::endl << std::endl;
-
   // Predicted state mean
   x_.fill(0.0);
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //iterate over sigma points
